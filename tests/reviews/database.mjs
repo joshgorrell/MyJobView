@@ -394,5 +394,26 @@ console.log(
  assert.ok((await projectEvents()).rows[0].cancelled_at);
  await ledgerDb.exec(`UPDATE projects SET substantial_completion_date=CURRENT_DATE WHERE id='${id(51)}'`);
  assert.equal((await projectEvents()).rows.length,2);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128144500_feedback_support_resolution_adapter.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ CREATE TABLE tasks(id uuid PRIMARY KEY, organization_id uuid, status text, is_support_request boolean, contact_id uuid, completed_at timestamptz);
+ CREATE TRIGGER test_support_resolution AFTER UPDATE ON tasks
+ FOR EACH ROW EXECUTE FUNCTION public.capture_feedback_support_resolution();
+ INSERT INTO tasks VALUES('${id(70)}','${id(1)}','pending',false,'${id(80)}',NULL),
+ ('${id(71)}','${id(1)}','pending',true,'${id(80)}',NULL),
+ ('${id(72)}','${id(1)}','pending',true,NULL,NULL),
+ ('${id(73)}','${id(1)}','completed',true,'${id(80)}',now());
+ UPDATE tasks SET status='completed',completed_at=now();
+ UPDATE tasks SET status='completed' WHERE id='${id(71)}';
+ `);
+ const supportEvents=()=>ledgerDb.query("SELECT source_id,cancelled_at FROM feedback_timeline_events WHERE timeline_key='support_completion'");
+ assert.equal((await supportEvents()).rows.length,1,'Only newly resolved customer support qualifies');
+ assert.equal((await supportEvents()).rows[0].source_id,id(71));
+ await ledgerDb.exec(`UPDATE tasks SET status='pending',completed_at=NULL WHERE id='${id(71)}'; UPDATE tasks SET status='completed',completed_at=now() WHERE id='${id(71)}';`);
+ const supportRows=(await supportEvents()).rows;
+ assert.equal(supportRows.length,2);
+ assert.equal(supportRows.filter(row=>row.cancelled_at!==null).length,1);
+ await ledgerDb.exec(`UPDATE tasks SET contact_id='${id(81)}' WHERE id='${id(71)}'`);
+ assert.ok((await supportEvents()).rows.every(row=>row.cancelled_at!==null));
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
