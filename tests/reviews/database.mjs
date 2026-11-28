@@ -350,5 +350,20 @@ console.log(
    const result = await ledgerDb.query('SELECT public.feedback_service_resolution_transition($1,$2) AS action',[before,after]);
    assert.equal(result.rows[0].action,expected);
  }
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128142000_feedback_service_ledger_adapter.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ CREATE TABLE service_requests(id uuid PRIMARY KEY, organization_id uuid, status text);
+ CREATE TRIGGER test_service_resolution AFTER UPDATE ON service_requests
+ FOR EACH ROW EXECUTE FUNCTION public.capture_feedback_service_resolution();
+ INSERT INTO service_requests VALUES('${id(40)}','${id(1)}','closed'),('${id(41)}','${id(1)}','open');
+ UPDATE service_requests SET status='closed' WHERE id='${id(41)}';
+ UPDATE service_requests SET status='closed' WHERE id='${id(41)}';
+ UPDATE service_requests SET status='open' WHERE id='${id(41)}';
+ UPDATE service_requests SET status='closed' WHERE id='${id(41)}';
+ `);
+ const captured = (await ledgerDb.query("SELECT source_id,cancelled_at FROM feedback_timeline_events WHERE source_id IN ($1,$2)",[id(40),id(41)])).rows;
+ assert.equal(captured.length,2,'Only actual closure transitions captured');
+ assert.ok(captured.every(row => row.source_id===id(41)));
+ assert.equal(captured.filter(row => row.cancelled_at!==null).length,1,'Reopening cancels prior occurrence');
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
