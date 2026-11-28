@@ -1,4 +1,5 @@
 import { composeBillingDraftPreview } from '../../lib/billingDraftPreview';
+import { formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { BILLING_TEMPLATE_DEFAULTS, validateBillingTemplates, renderBillingTemplatePreview, type BillingTemplate } from '../../lib/billingReminderTemplates';
@@ -15,8 +16,11 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
       const {data,error}=await supabase.from('invoices').select('id,organization_id,contact_id,due_date,status,amount_due,portal_visible,security_billing_cycle_id').eq('organization_id',organizationId).eq('portal_visible',true).in('status',['submitted','sent','partial','overdue']).gt('amount_due',0).is('security_billing_cycle_id',null).order('id').limit(101);
       if(error)throw error;
       if((data??[]).length>100)throw new Error('More than 100 invoices match. A paginated preview is required before displaying account totals.');
-      const now=new Date();
-      const asOf=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+      const {data:dealer,error:timezoneError}=await supabase.from('organizations').select('timezone').eq('id',organizationId).single();
+      if(timezoneError||!dealer?.timezone)throw new Error('Dealer timezone unavailable. Cannot calculate reminder stages.');
+      const asOf=formatDateInTimezone(new Date().toISOString(),dealer.timezone);
+      if(!asOf)throw new Error('Invalid dealer timezone.');
+
       setAccountPreview(composeBillingDraftPreview({organizationId,minimumDays:days,templates},(data??[]).filter(i=>i.contact_id).map(i=>({id:i.id,organizationId:i.organization_id,contactId:i.contact_id,dueDate:i.due_date,balanceCents:Math.round(Number(i.amount_due)*100),eligible:true,lastReminderOffset:null})),[],asOf));
     }catch(e){setError(e instanceof Error?e.message:'Unable to preview accounts.');}
     finally{setPreviewBusy(false);}
@@ -42,7 +46,7 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
     })();
     return ()=>{active=false;};
   },[organizationId]);
-  const edit=(index:number,patch:Partial<BillingTemplate>)=>{setTemplates(old=>old.map((t,i)=>i===index?{...t,...patch}:t));setPreview(null);setMessage('');};
+  const edit=(index:number,patch:Partial<BillingTemplate>)=>{setTemplates(old=>old.map((t,i)=>i===index?{...t,...patch}:t));setPreview(null);setAccountPreview(null);setMessage('');};
   async function save(){
     if(!loaded || saving)return;
     setError('');setMessage('');
@@ -62,22 +66,22 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
     {error&&<p role="alert" className="text-red-700">{error}</p>}
     {loading&&<p>Loading reminder settings…</p>}
     {loaded&&<fieldset disabled={saving||previewBusy} className="space-y-4">
-      <label className="block text-sm font-medium">Minimum days between account reminders<input type="number" min={1} max={365} value={days} onChange={e=>{setDays(Number(e.target.value));setMessage('');}} className="block border rounded p-2 w-28"/></label>
+      <label className="block text-sm font-medium">Minimum days between account reminders<input type="number" min={1} max={365} value={days} onChange={e=>{setDays(Number(e.target.value));setAccountPreview(null);setMessage('');}} className="block border rounded p-2 w-28"/></label>
       <p className="text-sm text-gray-600">Variables: {'{{customer_name}}'} and {'{{reminder_balance}}'}</p>
       {templates.map((t,i)=><div key={i} className="border rounded-lg p-3 space-y-2">
         <label className="block text-sm">Days relative to due date<input type="number" min={-365} max={365} value={t.offset} onChange={e=>edit(i,{offset:Number(e.target.value)})} className="block border rounded p-2 w-28"/></label>
         <label className="block text-sm">Subject<input value={t.subject} maxLength={160} onChange={e=>edit(i,{subject:e.target.value})} className="block border rounded p-2 w-full"/></label>
         <label className="block text-sm">Message<textarea value={t.body} maxLength={10000} onChange={e=>edit(i,{body:e.target.value})} className="block border rounded p-2 w-full" rows={4}/></label>
         <button type="button" className="text-blue-700 mr-4" onClick={()=>{try{setPreview(renderBillingTemplatePreview(t,'Sample Customer',250000));setError('');}catch(e){setError(e instanceof Error?e.message:'Invalid template');setPreview(null);}}}>Preview example</button>
-        <button type="button" className="text-red-700" onClick={()=>{setTemplates(old=>old.filter((_,j)=>j!==i));setPreview(null);setMessage('');}}>Remove stage</button>
+        <button type="button" className="text-red-700" onClick={()=>{setTemplates(old=>old.filter((_,j)=>j!==i));setPreview(null);setAccountPreview(null);setMessage('');}}>Remove stage</button>
       </div>)}
-      <button type="button" disabled={templates.length>=32} className="text-blue-700" onClick={()=>{setTemplates(old=>[...old,{offset:Math.min(365,(old[old.length - 1]?.offset??-1)+7),subject:'Payment reminder',body:'Hello {{customer_name}}, please review your outstanding invoices.'}]);setMessage('');}}>Add stage</button>
+      <button type="button" disabled={templates.length>=32} className="text-blue-700" onClick={()=>{setTemplates(old=>[...old,{offset:Math.min(365,(old[old.length - 1]?.offset??-1)+7),subject:'Payment reminder',body:'Hello {{customer_name}}, please review your outstanding invoices.'}]);setAccountPreview(null);setMessage('');}}>Add stage</button>
       {preview&&<div className="bg-gray-50 rounded p-3"><strong>{preview.subject}</strong><p className="whitespace-pre-wrap">{preview.body}</p></div>}
       <button type="button" onClick={()=>void save()} className="block bg-blue-600 text-white rounded px-4 py-2">{saving?'Saving…':'Save reminder draft'}</button>
       <button type="button" onClick={()=>void previewAccounts()} className="block border rounded px-4 py-2">{previewBusy?'Loading preview…':'Preview invoice candidates'}</button>
       {accountPreview&&<div className="rounded border p-3 space-y-2">
         <p className="font-medium">Illustrative candidates: {accountPreview.length} accounts</p>
-        <p className="text-sm text-gray-600">All candidates are held. Payment settlement, disputes, prior reminders and dealer timezone are not yet verified. Results are not payable statements or a delivery queue. Run again after editing settings.</p>
+        <p className="text-sm text-gray-600">All candidates are held. Payment settlement, disputes, prior reminders are not yet verified. Results are not payable statements or a delivery queue. Run again after editing settings.</p>
         {accountPreview.map(a=><div key={a.contactId} className="border-t py-2 text-sm">{a.invoices.length} invoice(s) · {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(a.balanceCents/100)} · Stage {a.stage} · History unavailable</div>)}
       </div>}
       {message&&<p role="status" className="text-green-700">{message}</p>}
