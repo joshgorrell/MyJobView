@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { recordedPaymentBreakdown as breakdown } from '../../supabase/functions/_shared/recorded-payment-breakdown.ts';
+assert.deepEqual(breakdown(2575,75),{grossAmount:2575,recordedFee:75,appliedAmount:2500});
+assert.deepEqual(breakdown('100.25',null),{grossAmount:100.25,recordedFee:0,appliedAmount:100.25});
+assert.equal(breakdown(10.3,0.2).appliedAmount,10.1);
+assert.throws(()=>breakdown(100,101));
+assert.throws(()=>breakdown(100,-1));
+assert.throws(()=>breakdown(null,0));
+assert.throws(()=>breakdown('invalid',0));
+console.log('Payment receipt breakdown checks passed');
