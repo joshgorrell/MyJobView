@@ -9,6 +9,7 @@ import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
 import { validateSubdomain } from '../../lib/subdomainConfig';
 import ConfirmModal from '../ui/ConfirmModal';
 import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
+import { BillingReminderDraftEditor } from './BillingReminderDraftEditor';
 import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
 export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' | 'email' }) {
@@ -1446,6 +1447,7 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
         </button>
       </div>
 
+      {profile?.organization_id && ['admin','owner'].includes(profile.role ?? '') && <BillingReminderDraftEditor key={profile.organization_id} organizationId={profile.organization_id}/>}
       </>}
       {section === 'automation' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
