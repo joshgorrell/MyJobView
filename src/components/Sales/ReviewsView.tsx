@@ -5,6 +5,7 @@ import { useToast } from '../Shared/Toast';
 import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock, TrendingUp } from 'lucide-react';
 import ProposalFollowUps from '../Reviews/ProposalFollowUps';
 import FeedbackInbox from '../Reviews/FeedbackInbox';
+import FeedbackTimelines from '../Reviews/FeedbackTimelines';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
 import { ReviewStatsRow, type StatItem } from '../Reviews/ReviewStats';
@@ -100,10 +101,10 @@ export default function ReviewsView() {
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canSendLostOpportunities = isAdmin || ((profile as any)?.can_send_lost_opportunity_reviews ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal' | 'inbox';
+  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal' | 'inbox' | 'timelines';
   const getReviewTabFromUrl = (): ReviewTab => {
     const tab = new URLSearchParams(window.location.search).get('reviewType');
-    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' || tab === 'inbox' ? tab : 'dashboard';
+    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' || tab === 'inbox' || tab === 'timelines' ? tab : 'dashboard';
   };
   const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
   const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
@@ -842,7 +843,9 @@ export default function ReviewsView() {
         {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-2 py-1 text-center transition sm:rounded-t-lg sm:py-2 ${activeTab === 'lost' ? 'border-violet-400 sm:bg-violet-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
           <MessageSquare className="mr-1 hidden h-4 w-4 text-violet-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Lost Opportunities</span>
         </button>}
+        {isAdmin && <button type="button" onClick={() => setActiveTab('timelines')} aria-current={activeTab === 'timelines' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 text-sm font-semibold ${activeTab === 'timelines' ? 'border-cyan-400 text-white' : 'border-transparent text-gray-300'}`}>Timelines</button>}
       </nav>
+      {activeTab === 'timelines' && (isAdmin && profile?.organization_id ? <FeedbackTimelines key={profile.organization_id} organizationId={profile.organization_id} /> : <p role="status" className="text-gray-300">Administrator access required.</p>)}
 
       {activeTab === 'inbox' && <FeedbackInbox onNavigate={tab => setActiveTab(tab)} canJob={canViewCustomerFeedback} canProposal={canManageCustomerFeedback} canLost={canViewLostOpportunities} />}
 
