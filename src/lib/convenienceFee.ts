@@ -28,15 +28,15 @@ export function calculateConvenienceFee(
 
   if (settings.cc_convenience_fee_type === 'flat') {
     const fee = Number(settings.cc_convenience_fee_flat_amount) || 0;
-    return { feeAmount: fee, totalWithFee: paymentAmount + fee, label, applies: true };
+    return { feeAmount: fee, totalWithFee: paymentAmount + fee, label: fee > 0 ? label : '', applies: fee > 0 };
   }
 
   const percent = Number(settings.cc_convenience_fee_percentage) || 0;
   const fee = Math.round(paymentAmount * percent * 100) / 100;
-  return { feeAmount: fee, totalWithFee: paymentAmount + fee, label, applies: true };
+  return { feeAmount: fee, totalWithFee: paymentAmount + fee, label: fee > 0 ? label : '', applies: fee > 0 };
 }
 
 export function formatFeeLine(result: ConvenienceFeeResult): string {
-  if (!result.applies) return '';
+  if (!result.applies || !(result.feeAmount > 0)) return '';
   return `${result.label}: +$${result.feeAmount.toFixed(2)}`;
 }
