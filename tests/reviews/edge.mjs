@@ -192,3 +192,17 @@ delete globalThis.__lostDeps; delete globalThis.__lostHandler;
  }
  let rejected=false;try{renderFeedbackTemplate(template,{...values,feedback_url:'javascript:alert(1)'})}catch{rejected=true}if(!rejected)throw new Error('Unsafe feedback URL accepted');
 }
+
+{
+ const {resolveFeedbackRecipient}=await import('../../supabase/functions/_shared/feedback-recipient.mjs');
+ const data={feedback_timeline_events:[{id:'e',organization_id:'a',timeline_key:'service_completion',source_id:'s',cancelled_at:null}],service_requests:[{id:'s',organization_id:'a',contact_id:'c'}],contacts:[{id:'c',organization_id:'b',email:'wrong@example.com'}]};
+ const db={from(table){let filters=[];return {select(){return this},eq(k,v){filters.push([k,v]);return this},async maybeSingle(){return {data:(data[table]||[]).find(r=>filters.every(([k,v])=>r[k]===v))||null,error:null}}}}};
+ assert.equal((await resolveFeedbackRecipient(db,'a','e')).reason,'missing_contact');
+ data.contacts.push({id:'c',organization_id:'a',email:'right@example.com',full_name:'Customer A'});
+ assert.equal((await resolveFeedbackRecipient(db,'a','e')).email,'right@example.com');
+ assert.equal((await resolveFeedbackRecipient(db,'b','e')).reason,'event_ineligible');
+ data.contacts[1].email='a@example.com,b@example.com';
+ assert.equal((await resolveFeedbackRecipient(db,'a','e')).reason,'invalid_recipient');
+ data.feedback_timeline_events[0].cancelled_at='2026-11-28';
+ assert.equal((await resolveFeedbackRecipient(db,'a','e')).reason,'event_ineligible');
+}
