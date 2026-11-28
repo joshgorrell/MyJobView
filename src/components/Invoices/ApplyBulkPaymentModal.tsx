@@ -206,7 +206,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
       const insertedPaymentIds = (recorded??[]).map(p=>p.id);
       const paymentByInvoice = new Map((recorded??[]).map(p=>[p.invoice_id,p.id]));
 
-      if (sendReceipt && contactEmail && insertedPaymentIds.length === rows.length && rows.every(row=>paymentByInvoice.has(row.id))) {
+      if (convenienceFee === 0 && sendReceipt && contactEmail && insertedPaymentIds.length === rows.length && rows.every(row=>paymentByInvoice.has(row.id))) {
         const bulkSummary = rows.map(row => ({
           paymentId: paymentByInvoice.get(row.id),
           invoiceId: row.id,
@@ -585,7 +585,10 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 />
               </div>
 
-              {/* Receipt toggle */}
+              {/* Fee-bearing receipts require server-side ledger reconciliation before enabling. */}
+              {convenienceFee > 0 ? (
+                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Combined receipt is unavailable for payments with a recorded fee until receipt reconciliation is validated.</p>
+              ) : (
               <div className={`rounded-xl border-2 transition-colors ${sendReceipt ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
                 <button
                   type="button"
@@ -625,6 +628,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 )}
               </div>
 
+              )}
               <div className="h-2" />
             </div>
           </form>
