@@ -593,5 +593,16 @@ console.log(
  assert.equal(await resolutionGuard(146,'support_completion',id(2)),'missing_source');
  await ledgerDb.exec(`UPDATE tasks SET status='pending',completed_at=NULL WHERE id='${id(146)}'`);
  assert.equal(await resolutionGuard(146,'support_completion'),'support_ineligible');
+ await ledgerDb.exec(`
+ CREATE TABLE email_templates(organization_id uuid,template_type text,is_active boolean);
+ INSERT INTO email_templates VALUES('${id(1)}','work_order_feedback',true),('${id(1)}','invoice_sent',true),('${id(2)}','job_completion_survey',true);
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128154000_feedback_template_compatibility.sql', import.meta.url),'utf8'));
+ const setTemplate=async(key,template)=>ledgerDb.query("UPDATE feedback_timeline_drafts SET steps=$1::jsonb WHERE organization_id=$2 AND timeline_key=$3",[JSON.stringify([{delay_days:1,template_key:template}]),id(1),key]);
+ await setTemplate('service_completion','work_order_feedback');
+ await assert.rejects(setTemplate('service_completion','invoice_sent'));
+ await assert.rejects(setTemplate('service_completion','job_completion_survey'));
+ await ledgerDb.exec("UPDATE email_templates SET is_active=false");
+ await assert.rejects(setTemplate('service_completion','work_order_feedback'));
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
