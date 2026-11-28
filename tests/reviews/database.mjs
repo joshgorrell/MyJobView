@@ -415,5 +415,25 @@ console.log(
  assert.equal(supportRows.filter(row=>row.cancelled_at!==null).length,1);
  await ledgerDb.exec(`UPDATE tasks SET contact_id='${id(81)}' WHERE id='${id(71)}'`);
  assert.ok((await supportEvents()).rows.every(row=>row.cancelled_at!==null));
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128145000_feedback_proposal_event_adapter.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ CREATE TABLE proposals(id uuid PRIMARY KEY, organization_id uuid, status text, sent_at timestamptz);
+ CREATE TRIGGER test_proposal_transition AFTER UPDATE ON proposals
+ FOR EACH ROW EXECUTE FUNCTION public.capture_feedback_proposal_transition();
+ INSERT INTO proposals VALUES('${id(90)}','${id(1)}','draft',NULL),('${id(91)}','${id(1)}','sent',now());
+ UPDATE proposals SET status='sent',sent_at='2026-11-28T12:00:00Z' WHERE id='${id(90)}';
+ UPDATE proposals SET status='sent' WHERE id='${id(90)}';
+ UPDATE proposals SET status='viewed' WHERE id='${id(90)}';
+ UPDATE proposals SET status='declined' WHERE id='${id(90)}';
+ `);
+ const proposalEvents=()=>ledgerDb.query("SELECT timeline_key,source_id,cancelled_at FROM feedback_timeline_events WHERE timeline_key IN ('proposal_check','lost_opportunity')");
+ const proposalRows=(await proposalEvents()).rows;
+ assert.equal(proposalRows.length,2);
+ assert.ok(proposalRows.every(row=>row.source_id===id(90)));
+ assert.ok(proposalRows.find(row=>row.timeline_key==='proposal_check').cancelled_at);
+ assert.equal(proposalRows.find(row=>row.timeline_key==='lost_opportunity').cancelled_at,null);
+ await ledgerDb.exec(`UPDATE proposals SET status='sent',sent_at='2026-11-28T13:00:00Z' WHERE id='${id(90)}'; UPDATE proposals SET status='approved' WHERE id='${id(90)}'`);
+ assert.equal((await proposalEvents()).rows.length,3);
+ assert.ok((await proposalEvents()).rows.every(row=>row.cancelled_at!==null));
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
