@@ -475,5 +475,27 @@ console.log(
  assert.equal(previewRows[0].template_key,'example');
  await ledgerDb.exec(`UPDATE feedback_timeline_events SET cancelled_at=now(),cancellation_reason='test' WHERE source_id='${id(95)}'`);
  assert.equal((await preview()).rows.length,0);
+ await ledgerDb.exec(`
+ ALTER TABLE proposals ADD COLUMN decline_reason text, ADD COLUMN declined_by text;
+ CREATE TABLE proposal_check_emails(id uuid,organization_id uuid,proposal_id uuid,status text);
+ CREATE TABLE proposal_check_events(email_id uuid,organization_id uuid,created_at timestamptz,kind text,suspected_automated boolean);
+ CREATE TABLE proposal_loss_feedback(organization_id uuid,proposal_id uuid,source text);
+ CREATE TABLE lost_review_details(organization_id uuid,proposal_id uuid,responded_at timestamptz);
+ INSERT INTO proposals(id,organization_id,status) VALUES('${id(98)}','${id(1)}','sent');
+ INSERT INTO proposal_check_emails VALUES('${id(99)}','${id(1)}','${id(98)}','sent');
+ INSERT INTO proposal_check_events VALUES('${id(99)}','${id(1)}','2026-11-28T12:00Z','link_visit',false);
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128150500_feedback_proposal_response_suppression.sql', import.meta.url),'utf8'));
+ const suppression=async(key,org=id(1))=>(await ledgerDb.query("SELECT public.feedback_proposal_suppression($1,$2,$3,'2026-11-27T12:00Z') AS reason",[org,id(98),key])).rows[0].reason;
+ assert.equal(await suppression('proposal_check'),null);
+ assert.equal(await suppression('proposal_check',id(2)),'missing_source');
+ await ledgerDb.exec(`INSERT INTO proposal_check_events VALUES('${id(99)}','${id(1)}','2026-11-28T12:00Z','interaction',true)`);
+ assert.equal(await suppression('proposal_check'),null);
+ await ledgerDb.exec(`INSERT INTO proposal_check_events VALUES('${id(99)}','${id(1)}','2026-11-28T12:00Z','message',false)`);
+ assert.equal(await suppression('proposal_check'),'customer_responded');
+ await ledgerDb.exec(`UPDATE proposals SET status='declined' WHERE id='${id(98)}'; INSERT INTO proposal_loss_feedback VALUES('${id(1)}','${id(98)}','staff_assessment')`);
+ assert.equal(await suppression('lost_opportunity'),null);
+ await ledgerDb.exec(`INSERT INTO proposal_loss_feedback VALUES('${id(1)}','${id(98)}','phone')`);
+ assert.equal(await suppression('lost_opportunity'),'customer_responded');
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
