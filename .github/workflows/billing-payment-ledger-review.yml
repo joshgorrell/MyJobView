@@ -1,0 +1,17 @@
+name: Billing payment ledger regression
+on:
+  pull_request:
+    paths:
+      - 'tests/billing/payment-ledger-database.mjs'
+      - 'supabase/migrations/20261016145000_separate_payment_convenience_fee.sql'
+      - '.github/workflows/billing-payment-ledger-review.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node tests/billing/payment-ledger-database.mjs
