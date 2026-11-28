@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const src=readFileSync(new URL('../../src/components/Portal/PortalInvoices.tsx',import.meta.url),'utf8');
+const extract=name=>src.split('\n').filter(l=>l.trim().startsWith('const '+name+' = ')).map(l=>l.trim());
+const selections=extract('selectedInvoices');assert.equal(selections.length,3);assert.ok(selections.every(s=>s===selections[0]));
+const select=new Function('invoices','selectedInvoiceIds',selections[0]+';return selectedInvoices');
+const all=new Function('outstandingInvoices',extract('unpaidInvoices')[0]+';return unpaidInvoices');
+const base={id:'a',amount_due:100,status:'submitted',qbo_invoice_id:'q',qbo_payment_url:'https://example.test',security_billing_cycle_id:null};
+const rows=[base,{...base,id:'b',status:'paid'},{...base,id:'c',amount_due:0},{...base,id:'d',security_billing_cycle_id:'s'},{...base,id:'e',status:'void'},{...base,id:'f',status:'draft'}];
+assert.deepEqual(select(rows,rows.map(r=>r.id)),[base]);
+assert.deepEqual(all([base,{...base,id:'b',qbo_invoice_id:null},{...base,id:'c',qbo_payment_url:null},{...base,id:'d',security_billing_cycle_id:'s'},{...base,id:'e',qbo_payment_url:'http://example.test'}]),[base]);
+console.log('Hosted payment selection checks passed');
