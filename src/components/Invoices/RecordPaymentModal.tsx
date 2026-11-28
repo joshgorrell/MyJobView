@@ -142,16 +142,8 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
 
       if (paymentError) throw paymentError;
 
-      const newAmountPaid = invoice.amount_paid + paymentAmount;
-      const newAmountDue = invoice.total - newAmountPaid;
-      const newStatus = newAmountDue <= 0 ? 'paid' : 'partial';
-
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .update({ amount_paid: newAmountPaid, amount_due: newAmountDue, status: newStatus })
-        .eq('id', invoice.id);
-
-      if (invoiceError) throw invoiceError;
+      // The database payment trigger recalculates invoice principal and balance.
+      // Do not overwrite it with the client-side invoice snapshot.
 
       if (sendReceipt && hasEmail) {
         try {
