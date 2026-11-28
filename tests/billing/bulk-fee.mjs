@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { allocateRecordedFee as allocate } from '../../src/lib/bulkPaymentFeeAllocation.ts';
+assert.deepEqual(allocate([10000,20000],900),[300,600]);
+assert.deepEqual(allocate([100,100,100],1),[1,0,0]);
+assert.deepEqual(allocate([100,200],0),[0,0]);
+assert.deepEqual(allocate([100,200],5),[2,3]);
+assert.throws(()=>allocate([0,100],5));
+assert.throws(()=>allocate([100],-1));
+assert.throws(()=>allocate([],1));
+console.log('Bulk payment fee allocation checks passed');
