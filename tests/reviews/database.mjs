@@ -365,5 +365,15 @@ console.log(
  assert.equal(captured.length,2,'Only actual closure transitions captured');
  assert.ok(captured.every(row => row.source_id===id(41)));
  assert.equal(captured.filter(row => row.cancelled_at!==null).length,1,'Reopening cancels prior occurrence');
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128142500_feedback_project_milestone_transition.sql', import.meta.url),'utf8'));
+ for (const [before,after,expected] of [
+   [null,'2026-11-28','record'], [null,'2026-11-29',null],
+   ['2026-11-28','2026-11-28',null], ['2026-11-28',null,'cancel'],
+   ['2026-11-28','2026-11-29','cancel'], ['2026-11-27','2026-11-28','correct'],
+   ['2026-11-29','2026-11-28','record'], [null,'infinity',null]
+ ]) {
+   const result=await ledgerDb.query("SELECT public.feedback_project_milestone_transition($1::date,$2::date,'2026-11-28'::date) AS action",[before,after]);
+   assert.equal(result.rows[0].action,expected);
+ }
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
