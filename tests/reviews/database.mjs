@@ -435,5 +435,30 @@ console.log(
  await ledgerDb.exec(`UPDATE proposals SET status='sent',sent_at='2026-11-28T13:00:00Z' WHERE id='${id(90)}'; UPDATE proposals SET status='approved' WHERE id='${id(90)}'`);
  assert.equal((await proposalEvents()).rows.length,3);
  assert.ok((await proposalEvents()).rows.every(row=>row.cancelled_at!==null));
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128145500_feedback_future_milestone_dates.sql', import.meta.url),'utf8'));
+ for (const [key,completion,end,expected] of [
+ ['test_tune','2026-01-01','2026-04-05','2026-04-05'],
+ ['test_tune','2026-01-01',null,null],
+ ['one_year','2024-02-29','2024-06-01','2025-02-28'],
+ ['one_year','2025-11-28',null,'2026-11-28'],
+ ['one_year',null,'2026-11-28',null],
+ ['one_year','infinity',null,null],
+ ['job_completion','2026-11-28',null,null]
+ ]) {
+ const result=await ledgerDb.query("SELECT public.feedback_future_milestone_date($1,$2::date,$3::date)::text AS day",[key,completion,end]);
+ assert.equal(result.rows[0].day,expected);
+ }
+ for (const [day,activation,today,window,expected] of [
+ ['2026-11-28','2026-11-01','2026-11-28',7,true],
+ ['2026-11-21','2026-11-01','2026-11-28',7,true],
+ ['2026-11-20','2026-11-01','2026-11-28',7,false],
+ ['2026-11-21','2026-11-22','2026-11-28',7,false],
+ ['2026-11-29','2026-11-01','2026-11-28',7,false],
+ ['2026-11-28',null,'2026-11-28',7,false],
+ ['2026-11-28','2026-11-01','2026-11-28',31,false]
+ ]) {
+ const result=await ledgerDb.query("SELECT public.feedback_milestone_due($1::date,$2::date,$3::date,$4) AS due",[day,activation,today,window]);
+ assert.equal(result.rows[0].due,expected);
+ }
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
