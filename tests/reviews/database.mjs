@@ -375,5 +375,24 @@ console.log(
    const result=await ledgerDb.query("SELECT public.feedback_project_milestone_transition($1::date,$2::date,'2026-11-28'::date) AS action",[before,after]);
    assert.equal(result.rows[0].action,expected);
  }
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128143000_feedback_project_ledger_adapter.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ CREATE TABLE projects(id uuid PRIMARY KEY, organization_id uuid, substantial_completion_date date);
+ CREATE TRIGGER test_project_completion AFTER UPDATE ON projects
+ FOR EACH ROW EXECUTE FUNCTION public.capture_feedback_project_completion();
+ INSERT INTO projects VALUES('${id(50)}','${id(1)}',CURRENT_DATE-10),('${id(51)}','${id(1)}',NULL);
+ UPDATE projects SET substantial_completion_date=CURRENT_DATE-9 WHERE id='${id(50)}';
+ UPDATE projects SET substantial_completion_date=CURRENT_DATE WHERE id='${id(51)}';
+ UPDATE projects SET substantial_completion_date=CURRENT_DATE-1 WHERE id='${id(51)}';
+ `);
+ const projectEvents=()=>ledgerDb.query("SELECT id,source_id,occurred_at,cancelled_at FROM feedback_timeline_events WHERE timeline_key='job_completion'");
+ const initial=(await projectEvents()).rows;
+ assert.equal(initial.length,1,'Historical correction does not enroll');
+ assert.equal(initial[0].source_id,id(51));
+ assert.equal(new Date(initial[0].occurred_at).toISOString().slice(0,10),(await ledgerDb.query("SELECT (CURRENT_DATE-1)::text AS day")).rows[0].day);
+ await ledgerDb.exec(`UPDATE projects SET substantial_completion_date=CURRENT_DATE+1 WHERE id='${id(51)}'`);
+ assert.ok((await projectEvents()).rows[0].cancelled_at);
+ await ledgerDb.exec(`UPDATE projects SET substantial_completion_date=CURRENT_DATE WHERE id='${id(51)}'`);
+ assert.equal((await projectEvents()).rows.length,2);
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
