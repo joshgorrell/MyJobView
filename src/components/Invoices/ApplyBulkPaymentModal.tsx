@@ -120,7 +120,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const quotedFee = feeResult.feeAmount;
   const principalCentsEntered = Math.round(totalEntered * 100);
   const grossCentsEntered = Math.round(Number(recordedGross) * 100);
-  const validGross = recordedGross.trim() !== '' && Number.isFinite(Number(recordedGross))
+  const validGross = /^\d+(?:\.\d{1,2})?$/.test(recordedGross.trim()) && Number.isSafeInteger(grossCentsEntered)
     && (grossCentsEntered === principalCentsEntered || grossCentsEntered === principalCentsEntered + Math.round(quotedFee * 100));
   const convenienceFee = quotedFee > 0 && validGross ? (grossCentsEntered - principalCentsEntered) / 100 : 0;
 
@@ -166,11 +166,11 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
 
   const hasOverAllocation = allocations.some(row => {
     const alloc = parseFloat(row.allocation) || 0;
-    return alloc > row.amount_due;
+    return alloc < 0 || alloc > row.amount_due;
   });
 
   const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
-  const feeAllocationIncomplete = convenienceFee > 0 && Math.round(totalEntered * 100) !== Math.round(totalAllocated * 100);
+  const feeAllocationIncomplete = quotedFee > 0 && Math.round(totalEntered * 100) !== Math.round(totalAllocated * 100);
   const canSubmit = (quotedFee <= 0 || validGross) && !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -367,7 +367,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 </div>
               )}
 
-              {feeAllocationIncomplete && <p role="alert" className="text-sm text-amber-900">Allocate the entire payment before recording a payment with a convenience fee.</p>}
+              {feeAllocationIncomplete && <p role="alert" className="text-sm text-amber-900">Allocate the entire payment before recording a total confirmed against the configured fee.</p>}
               {/* Payment method */}
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">Payment Method <span className="text-red-500">*</span></label>
@@ -654,7 +654,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
             {(hasOverAllocation || allocationExceedsTotal) && (
               <div className="px-5 py-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 border-b border-red-100">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {hasOverAllocation ? 'One or more allocations exceed the invoice amount due.' : 'Total allocations exceed the payment amount entered.'}
+                {hasOverAllocation ? 'One or more allocations are negative or exceed the invoice amount due.' : 'Total allocations exceed the payment amount entered.'}
               </div>
             )}
             {/* Action buttons */}
