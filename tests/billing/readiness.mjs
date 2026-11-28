@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { previewPaymentReadiness as preview } from '../../src/lib/billingPaymentReadiness.ts';
+const connection={connected:true,environment:'production',paymentsEnabled:true};
+const method={method:'credit_card',supported:true,merchantEnabled:true,deviceAvailable:true,feeEligibility:'unknown'};
+assert.equal(preview(connection,[method],true)[0].reason,'fee-unverified');
+assert.equal(preview(connection,[method],false)[0].reason,'review-ready');
+assert.equal(preview({...connection,environment:'sandbox'},[method],false)[0].reason,'not-live');
+assert.equal(preview({...connection,paymentsEnabled:false},[method],false)[0].reason,'connection-unavailable');
+assert.equal(preview(connection,[{...method,deviceAvailable:false}],false)[0].reason,'method-unavailable');
+assert.equal(preview(connection,[method],false)[0].chargeAuthorized,false);
+assert.throws(()=>preview(connection,[method,method],false));
+console.log('Payment readiness tests passed');
