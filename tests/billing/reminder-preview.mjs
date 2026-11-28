@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { previewBillingReminder as preview } from '../../src/lib/billingReminderPreview.ts';
+const invoice = {id:'demo', dueDate:'2026-11-27', balanceCents:12345, eligible:true, lastReminderOffset:null};
+assert.equal(preview(invoice,'2026-11-21'),null);
+assert.equal(preview(invoice,'2026-11-22'),-5);
+assert.equal(preview(invoice,'2026-11-27'),0);
+assert.equal(preview(invoice,'2026-12-27'),30);
+assert.equal(preview({...invoice,lastReminderOffset:30},'2026-12-27'),null);
+assert.equal(preview({...invoice,lastReminderOffset:30},'2027-01-11'),45);
+assert.equal(preview({...invoice,eligible:false},'2026-12-27'),null);
+assert.equal(preview({...invoice,balanceCents:0},'2026-12-27'),null);
+assert.equal(preview({...invoice,dueDate:null},'2026-12-27'),null);
+assert.throws(()=>preview(invoice,'2026-02-30'));
+assert.equal(preview(invoice,'2026-12-27',[10,20]),20);
+console.log('Billing reminder preview tests passed');
