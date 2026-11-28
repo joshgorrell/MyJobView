@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
+import { allocateRecordedFee } from '../../lib/bulkPaymentFeeAllocation';
 import { calculateConvenienceFee, ConvenienceFeeSettings } from '../../lib/convenienceFee';
 
 interface OpenInvoice {
@@ -160,7 +161,8 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   });
 
   const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
-  const canSubmit = totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
+  const feeAllocationIncomplete = convenienceFee > 0 && Math.round(totalEntered * 100) !== Math.round(totalAllocated * 100);
+  const canSubmit = !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -178,10 +180,13 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
       // One insert statement: either all payment rows are recorded or none are.
       // Existing database triggers own invoice balances.
-      const {data: recorded, error: paymentError} = await supabase.from('payments').insert(rows.map(row=>({
+      const principalCents=rows.map(row=>Math.round(parseFloat(row.allocation)*100));
+      const feeCents=allocateRecordedFee(principalCents,Math.round(convenienceFee*100));
+      const {data: recorded, error: paymentError} = await supabase.from('payments').insert(rows.map((row,index)=>({
         invoice_id: row.id,
         contact_id: contactId,
-        amount: parseFloat(row.allocation),
+        amount: (principalCents[index]+feeCents[index])/100,
+        convenience_fee_amount: feeCents[index]/100,
         payment_date: paymentDate,
         payment_method: paymentMethod,
         reference_number: referenceNumber || null,
@@ -341,12 +346,13 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                     <span>{formatCurrency(convenienceFee)}</span>
                   </div>
                   <div className="flex justify-between font-bold pt-1.5 border-t border-amber-300 text-amber-900 text-base">
-                    <span>Total to Charge</span>
+                    <span>Total collected (record only)</span>
                     <span>{formatCurrency(totalEntered + convenienceFee)}</span>
                   </div>
                 </div>
               )}
 
+              {feeAllocationIncomplete && <p role="alert" className="text-sm text-amber-900">Allocate the entire payment before recording a payment with a convenience fee.</p>}
               {/* Payment method */}
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">Payment Method <span className="text-red-500">*</span></label>
