@@ -394,5 +394,22 @@ console.log(
  assert.ok((await projectEvents()).rows[0].cancelled_at);
  await ledgerDb.exec(`UPDATE projects SET substantial_completion_date=CURRENT_DATE WHERE id='${id(51)}'`);
  assert.equal((await projectEvents()).rows.length,2);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128143500_feedback_security_completion_adapter.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ CREATE TABLE security_contracts(id uuid PRIMARY KEY, organization_id uuid, status text, customer_completed_at timestamptz);
+ CREATE TRIGGER test_security_completion AFTER UPDATE ON security_contracts
+ FOR EACH ROW EXECUTE FUNCTION public.capture_feedback_security_completion();
+ INSERT INTO security_contracts VALUES('${id(60)}','${id(1)}','active',now()),('${id(61)}','${id(1)}','pending_approval',now()),('${id(62)}','${id(1)}','approved',NULL);
+ UPDATE security_contracts SET status='approved' WHERE id='${id(61)}';
+ UPDATE security_contracts SET status='active' WHERE id='${id(62)}';
+ `);
+ const securityEvents=()=>ledgerDb.query("SELECT source_id,cancelled_at FROM feedback_timeline_events WHERE timeline_key='security_onboarding'");
+ assert.equal((await securityEvents()).rows.length,0,'Submission, approval and historical active contracts do not enroll');
+ await ledgerDb.exec(`UPDATE security_contracts SET status='active' WHERE id='${id(61)}'; UPDATE security_contracts SET status='active' WHERE id='${id(61)}';`);
+ assert.equal((await securityEvents()).rows.length,1);
+ await ledgerDb.exec(`UPDATE security_contracts SET status='cancelled' WHERE id='${id(61)}'; UPDATE security_contracts SET status='approved' WHERE id='${id(61)}'; UPDATE security_contracts SET status='active' WHERE id='${id(61)}';`);
+ const securityRows=(await securityEvents()).rows;
+ assert.equal(securityRows.length,1,'Reactivation does not repeat onboarding');
+ assert.ok(securityRows[0].cancelled_at);
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
