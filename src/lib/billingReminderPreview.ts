@@ -51,3 +51,32 @@ export function previewAccountReminders(invoices: readonly AccountPreviewInvoice
   }
   return [...groups.values()];
 }
+
+export interface AccountReminderHistory {
+  organizationId: string;
+  contactId: string;
+  lastSentDate: string | null;
+}
+
+// Evaluation only. History must be complete and authoritative before any future delivery.
+export function applyAccountReminderCadence(
+  candidates: ReturnType<typeof previewAccountReminders>,
+  history: readonly AccountReminderHistory[],
+  asOf: string,
+  minimumDays: number,
+) {
+  if (!Number.isSafeInteger(minimumDays) || minimumDays < 1) throw new Error('Invalid reminder cadence');
+  const currentDay = dayNumber(asOf);
+  const records = new Map<string, number | null>();
+  for (const entry of history) {
+    const key = JSON.stringify([entry.organizationId, entry.contactId]);
+    if (!entry.organizationId || !entry.contactId || records.has(key)) throw new Error('Invalid account history');
+    records.set(key, entry.lastSentDate === null ? null : dayNumber(entry.lastSentDate));
+  }
+  return candidates.map(candidate => {
+    const key = JSON.stringify([candidate.organizationId, candidate.contactId]);
+    const last = records.get(key);
+    const reason = last === undefined ? 'history-unavailable' : last !== null && currentDay - last < minimumDays ? 'cadence-hold' : 'preview-ready';
+    return {...candidate, reason};
+  });
+}
