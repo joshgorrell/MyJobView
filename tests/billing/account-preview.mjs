@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { previewAccountReminders as preview } from '../../src/lib/billingReminderPreview.ts';
+const row = {id:'a', organizationId:'dealer1', contactId:'customer1', dueDate:'2026-11-01', balanceCents:100, eligible:true, lastReminderOffset:null};
+const rows = [row, {...row,id:'b',balanceCents:200,dueDate:'2026-11-20'}, {...row,id:'c',eligible:false}, {...row,id:'d',organizationId:'dealer2'}, {...row,id:'e',contactId:'customer2'}, {...row,id:'f',lastReminderOffset:15}];
+const result=preview(rows,'2026-11-27');
+assert.equal(result.length,3);
+assert.equal(result[0].balanceCents,300);
+assert.equal(result[0].stage,15);
+assert.deepEqual(result[0].invoices.map(x=>x.id),['a','b']);
+assert.equal(result[1].organizationId,'dealer2');
+assert.equal(result[2].contactId,'customer2');
+assert.throws(()=>preview([row,row],'2026-11-27'));
+assert.deepEqual(preview([],'2026-11-27'),[]);
+console.log('Account reminder preview checks passed');
