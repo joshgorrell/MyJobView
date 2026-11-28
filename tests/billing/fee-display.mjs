@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { calculateConvenienceFee as calc, formatFeeLine as line } from '../../src/lib/convenienceFee.ts';
+const settings={cc_convenience_fee_enabled:true,cc_convenience_fee_type:'percentage',cc_convenience_fee_percentage:0.03,cc_convenience_fee_flat_amount:0,cc_convenience_fee_label:null};
+assert.equal(line(calc(2500,'ach',settings)),'');
+assert.equal(line(calc(2500,'credit_card',{...settings,cc_convenience_fee_enabled:false})),'');
+assert.equal(line(calc(2500,'credit_card',{...settings,cc_convenience_fee_percentage:0})),'');
+assert.equal(line(calc(2500,'credit_card',{...settings,cc_convenience_fee_type:'flat'})),'');
+assert.equal(line(calc(0.01,'credit_card',settings)),'');
+assert.equal(line(calc(2500,'credit_card',settings)),'Credit Card Convenience Fee: +$75.00');
+assert.equal(line({applies:true,feeAmount:0,label:'Fee',totalWithFee:100}),'');
+console.log('Zero-fee display checks passed');
