@@ -1,0 +1,17 @@
+name: Billing aging regression
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261128143000_extend_finance_aging_metrics.sql'
+      - 'tests/billing/**'
+      - '.github/workflows/billing-aging-review.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node tests/billing/finance-aging-database.mjs
