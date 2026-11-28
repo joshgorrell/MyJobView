@@ -460,5 +460,20 @@ console.log(
  const result=await ledgerDb.query("SELECT public.feedback_milestone_due($1::date,$2::date,$3::date,$4) AS due",[day,activation,today,window]);
  assert.equal(result.rows[0].due,expected);
  }
+ await ledgerDb.exec(`
+ CREATE TABLE feedback_timeline_drafts(organization_id uuid,timeline_key text,steps jsonb);
+ INSERT INTO feedback_timeline_drafts VALUES ('${id(1)}','service_completion','[{"delay_days":0,"template_key":"example"},{"delay_days":2,"template_key":"example"}]'),('${id(2)}','service_completion','[{"delay_days":0,"template_key":"other"}]');
+ INSERT INTO feedback_timeline_events(organization_id,timeline_key,source_id,occurrence_key,occurred_at,recorded_at)
+ VALUES ('${id(1)}','service_completion','${id(95)}','preview','2026-11-27T12:00Z','2026-11-27T12:00Z'),
+ ('${id(2)}','service_completion','${id(96)}','preview','2026-11-27T12:00Z','2026-11-27T12:00Z'),
+ ('${id(1)}','service_completion','${id(97)}','old','2026-10-01T12:00Z','2026-11-27T12:00Z');
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128150000_feedback_dry_run_planner.sql', import.meta.url),'utf8'));
+ const preview=()=>ledgerDb.query("SELECT * FROM public.preview_feedback_timeline_steps($1,'2026-11-28T12:00Z','2026-11-26T12:00Z',100)",[id(1)]);
+ const previewRows=(await preview()).rows;
+ assert.equal(previewRows.length,1);
+ assert.equal(previewRows[0].template_key,'example');
+ await ledgerDb.exec(`UPDATE feedback_timeline_events SET cancelled_at=now(),cancellation_reason='test' WHERE source_id='${id(95)}'`);
+ assert.equal((await preview()).rows.length,0);
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
