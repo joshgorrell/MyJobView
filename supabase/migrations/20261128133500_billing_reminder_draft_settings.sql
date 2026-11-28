@@ -1,6 +1,6 @@
 -- #1286: draft configuration only; no delivery or activation.
 CREATE FUNCTION public.valid_billing_reminder_templates(value jsonb)
-RETURNS boolean LANGUAGE plpgsql IMMUTABLE STRICT SET search_path = pg_catalog AS $
+RETURNS boolean LANGUAGE plpgsql IMMUTABLE STRICT SET search_path = pg_catalog AS $billing_validation$
 DECLARE item jsonb; stage numeric; previous numeric := -366; subject_text text; body_text text;
 BEGIN
   IF jsonb_typeof(value) <> 'array' OR jsonb_array_length(value) > 32 THEN RETURN false; END IF;
@@ -20,7 +20,7 @@ BEGIN
   END LOOP;
   RETURN true;
 END;
-$;
+$billing_validation$;
 
 CREATE TABLE public.billing_reminder_drafts (
   organization_id uuid PRIMARY KEY,
