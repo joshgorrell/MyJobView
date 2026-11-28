@@ -11,7 +11,81 @@ interface EmailTemplate {
   is_active: boolean;
 }
 
+const FEEDBACK_TYPES = [
+  {
+    "value": "feedback_proposal_check",
+    "label": "Proposal Check",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_lost_opportunity",
+    "label": "Lost Opportunity",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_job_completion",
+    "label": "Job Completion",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_service_completion",
+    "label": "Service Resolution",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_support_completion",
+    "label": "Support Resolution",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_test_tune",
+    "label": "Test & Tune",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  },
+  {
+    "value": "feedback_one_year",
+    "label": "Annual Check-In",
+    "category": "Feedback",
+    "placeholders": [
+      "{{customer_name}}",
+      "{{company_name}}",
+      "{{feedback_url}}"
+    ]
+  }
+];
+
 const TEMPLATE_TYPES = [
+  ...FEEDBACK_TYPES,
   {
     value: 'welcome_email',
     label: 'Welcome Email',
@@ -314,6 +388,11 @@ export function EmailTemplates() {
       setSubject(foundTemplate.subject);
       setBody(foundTemplate.body);
       setIsActive(foundTemplate.is_active);
+    } else {
+      setTemplate(null);
+      setSubject('');
+      setBody('');
+      setIsActive(false);
     }
   }
 
@@ -345,7 +424,7 @@ export function EmailTemplates() {
   }
 
   function renderPreview(text: string): string {
-    const sampleData = SAMPLE_DATA[selectedType] || {};
+    const sampleData = SAMPLE_DATA[selectedType] || (selectedType.startsWith('feedback_') ? { customer_name: 'Sarah Johnson', company_name: 'Example Integrator', feedback_url: 'https://example.com/feedback/preview' } : {});
     let rendered = text;
 
     Object.entries(sampleData).forEach(([key, value]) => {
