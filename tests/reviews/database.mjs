@@ -600,5 +600,17 @@ console.log(
  assert.equal(await compatible('invoice_sent'),false);
  assert.equal(await compatible(null),false);
  }
+ await ledgerDb.exec(`
+ CREATE TABLE email_templates(organization_id uuid REFERENCES organizations(id),template_type text,subject text,body text,is_active boolean,UNIQUE(organization_id,template_type));
+ `);
+ const defaults=await readFile(new URL('../../supabase/migrations/20261128154500_feedback_template_defaults.sql',import.meta.url),'utf8');
+ await ledgerDb.exec(defaults);
+ await ledgerDb.exec(`UPDATE email_templates SET subject='Custom subject' WHERE organization_id='${id(1)}' AND template_type='feedback_proposal_check'`);
+ await ledgerDb.exec(defaults);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128155000_feedback_new_dealer_templates.sql',import.meta.url),'utf8'));
+ await ledgerDb.exec(`INSERT INTO organizations(id) VALUES('${id(150)}')`);
+ assert.equal((await ledgerDb.query('SELECT * FROM email_templates WHERE organization_id=$1',[id(150)])).rows.length,7);
+ assert.equal((await ledgerDb.query("SELECT subject FROM email_templates WHERE organization_id=$1 AND template_type='feedback_proposal_check'",[id(1)])).rows[0].subject,'Custom subject');
+ assert.equal((await ledgerDb.query('SELECT * FROM feedback_timeline_events WHERE organization_id=$1',[id(150)])).rows.length,0);
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
