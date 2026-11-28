@@ -1,3 +1,4 @@
+import { recordedPaymentBreakdown } from '../_shared/recorded-payment-breakdown.ts';
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
@@ -265,8 +266,8 @@ Deno.serve(async (req: Request) => {
     const customerName = contact.full_name || contact.contact_name ||
       `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Valued Customer';
 
-    const previousBalance = (payment.invoice.amount_paid - payment.amount) + payment.invoice.amount_due;
-    const newBalance = payment.invoice.amount_due;
+    const {grossAmount,recordedFee,appliedAmount} = recordedPaymentBreakdown(payment.amount,payment.convenience_fee_amount);
+    const newBalance = Number(payment.invoice.amount_due);
     const isPaidInFull = newBalance <= 0;
 
     const subject = `Payment Receipt - Invoice #${payment.invoice.invoice_number}`;
@@ -307,16 +308,16 @@ Deno.serve(async (req: Request) => {
       <div style="background: #fef9c3; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <h3 style="margin: 0 0 14px 0; color: #78350f; font-size: 15px;">Balance Summary</h3>
         <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+          ${recordedFee > 0 ? `
+          <tr><td>Total received:</td><td style="text-align:right;">${grossAmount.toFixed(2)}</td></tr>
+          <tr><td>Included payment fee:</td><td style="text-align:right;">${recordedFee.toFixed(2)}</td></tr>
+          ` : ''}
           <tr>
-            <td style="padding: 5px 0; color: #92400e;">Previous Balance:</td>
-            <td style="padding: 5px 0; color: #92400e; font-weight: 600; text-align: right;">$${previousBalance.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px;">Payment Received:</td>
-            <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px; text-align: right;">−$${payment.amount.toFixed(2)}</td>
+            <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px;">Payment Applied:</td>
+            <td style="padding: 5px 0; color: #15803d; font-weight: 700; font-size: 16px; text-align: right;">−${appliedAmount.toFixed(2)}</td>
           </tr>
           <tr style="border-top: 2px solid #fbbf24;">
-            <td style="padding: 10px 0 4px 0; color: ${isPaidInFull ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 16px;">New Balance:</td>
+            <td style="padding: 10px 0 4px 0; color: ${isPaidInFull ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 16px;">Current Balance:</td>
             <td style="padding: 10px 0 4px 0; color: ${isPaidInFull ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 18px; text-align: right;">$${newBalance.toFixed(2)}</td>
           </tr>
         </table>
